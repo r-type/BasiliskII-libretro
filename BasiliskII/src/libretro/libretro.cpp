@@ -5,6 +5,7 @@
 
 #include "libretro.h"
 
+#define LOGI printf
 
 char Key_Sate[512];
 char Key_Sate2[512];
@@ -234,6 +235,7 @@ static void keyboard_cb(bool down, unsigned keycode, uint32_t character, uint16_
 
 }
 
+/*
 //        "./MacStartup.img",
 static const char* xargv[] = {
         "basilisk",
@@ -266,6 +268,185 @@ static void retro_wrap_emulator()
 	bmain(paramCount, ( char **)xargv);
  
 }
+*/
+extern int bmain(int argc, char **argv);
+static char CMDFILE[512];
+
+int loadcmdfile(char *argv)
+{
+    int res=0;
+
+    FILE *fp = fopen(argv,"r");
+
+    if( fp != NULL )
+    {
+	if ( fgets (CMDFILE , 512 , fp) != NULL )
+		res=1;	
+	fclose (fp);
+    }
+
+    return res;
+}
+
+int HandleExtension(char *path,char *ext)
+{
+   int len = strlen(path);
+
+   if (len >= 4 &&
+         path[len-4] == '.' &&
+         path[len-3] == ext[0] &&
+         path[len-2] == ext[1] &&
+         path[len-1] == ext[2])
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+#include <ctype.h>
+
+//Args for experimental_cmdline
+static char ARGUV[64][1024];
+static unsigned char ARGUC=0;
+
+// Args for Core
+static char XARGV[64][1024];
+static const char* xargv_cmd[64];
+int PARAMCOUNT=0;
+
+//extern int  skel_main(int argc, char *argv[]);
+void parse_cmdline( const char *argv );
+
+void Add_Option(const char* option)
+{
+   static int first=0;
+
+   if(first==0)
+   {
+      PARAMCOUNT=0;	
+      first++;
+   }
+
+   sprintf(XARGV[PARAMCOUNT++],"%s",option);
+}
+
+int pre_main(const char *argv)
+{
+   int i=0;
+   bool Only1Arg;
+
+   if (strlen(argv) > strlen("cmd"))
+   {
+      if( HandleExtension((char*)argv,"cmd") || HandleExtension((char*)argv,"CMD"))
+          i=loadcmdfile((char*)argv);     
+   }
+
+   if(i==1)
+   {
+      parse_cmdline(CMDFILE);      
+      LOGI("Starting game from command line :%s\n",CMDFILE);  
+   }
+   else
+   parse_cmdline(argv); 
+
+   Only1Arg = (strcmp(ARGUV[0],"BasiliskII") == 0) ? 0 : 1;
+
+   for (i = 0; i<64; i++)
+      xargv_cmd[i] = NULL;
+
+
+   if(Only1Arg)
+   {  
+/*
+      if (strlen(RPATH) >= strlen("crt"))
+         if(!strcasecmp(&RPATH[strlen(RPATH)-strlen("crt")], "crt"))
+            Add_Option("-cartcrt");
+*/
+      Add_Option("BasiliskII");
+      Add_Option("--rom");
+      Add_Option("./Quadra605.rom");
+      Add_Option("--config");
+      Add_Option("./BskII_prefs");
+      Add_Option("--disk");
+      Add_Option(RPATH/*ARGUV[0]*/);
+   }
+   else
+   { // Pass all cmdline args
+      for(i = 0; i < ARGUC; i++)
+         Add_Option(ARGUV[i]);
+   }
+
+   for (i = 0; i < PARAMCOUNT; i++)
+   {
+      xargv_cmd[i] = (char*)(XARGV[i]);
+      LOGI("%2d  %s\n",i,XARGV[i]);
+   }
+
+   bmain(PARAMCOUNT,( char **)xargv_cmd); 
+
+   xargv_cmd[PARAMCOUNT - 2] = NULL;
+
+   return 0;
+}
+
+void parse_cmdline(const char *argv)
+{
+	char *p,*p2,*start_of_word;
+	int c,c2;
+	static char buffer[512*4];
+	enum states { DULL, IN_WORD, IN_STRING } state = DULL;
+	
+	strcpy(buffer,argv);
+	strcat(buffer," \0");
+
+	for (p = buffer; *p != '\0'; p++)
+   {
+      c = (unsigned char) *p; /* convert to unsigned char for is* functions */
+      switch (state)
+      {
+         case DULL: /* not in a word, not in a double quoted string */
+            if (isspace(c)) /* still not in a word, so ignore this char */
+               continue;
+            /* not a space -- if it's a double quote we go to IN_STRING, else to IN_WORD */
+            if (c == '"')
+            {
+               state = IN_STRING;
+               start_of_word = p + 1; /* word starts at *next* char, not this one */
+               continue;
+            }
+            state = IN_WORD;
+            start_of_word = p; /* word starts here */
+            continue;
+         case IN_STRING:
+            /* we're in a double quoted string, so keep going until we hit a close " */
+            if (c == '"')
+            {
+               /* word goes from start_of_word to p-1 */
+               //... do something with the word ...
+               for (c2 = 0,p2 = start_of_word; p2 < p; p2++, c2++)
+                  ARGUV[ARGUC][c2] = (unsigned char) *p2;
+               ARGUC++; 
+
+               state = DULL; /* back to "not in word, not in string" state */
+            }
+            continue; /* either still IN_STRING or we handled the end above */
+         case IN_WORD:
+            /* we're in a word, so keep going until we get to a space */
+            if (isspace(c))
+            {
+               /* word goes from start_of_word to p-1 */
+               //... do something with the word ...
+               for (c2 = 0,p2 = start_of_word; p2 <p; p2++,c2++)
+                  ARGUV[ARGUC][c2] = (unsigned char) *p2;
+               ARGUC++; 
+
+               state = DULL; /* back to "not in word, not in string" state */
+            }
+            continue; /* either still IN_WORD or we handled the end above */
+      }	
+   }
+}
 
 /************************************
  * libretro implementation
@@ -279,7 +460,7 @@ void retro_get_system_info(struct retro_system_info *info)
 	info->library_name = "BasiliskII";
 	info->library_version = "0";
 	info->need_fullpath = true;
-	info->valid_extensions = "img";
+	info->valid_extensions = "cmd|img|hfv|dsk";
 }
 
 /*
@@ -443,7 +624,7 @@ void retro_run(void)
 	if(fois==0)
 	{
 		fois=1;
-		retro_wrap_emulator();
+		pre_main(RPATH);
 		return;
 	}
 
