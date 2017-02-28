@@ -135,6 +135,17 @@ void InitFrameBufferMapping(void)
  *  Reset and start 680x0 emulation (doesn't return)
  */
 
+#ifdef __LIBRETRO__
+/* libretro loop */
+extern void retroloop();
+
+void retrostart(){
+
+	m68k_reset();
+	retroloop();
+}
+#endif
+
 void Start680x0(void)
 {
 	m68k_reset();

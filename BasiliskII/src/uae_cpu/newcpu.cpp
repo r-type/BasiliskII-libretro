@@ -1371,6 +1371,14 @@ int m68k_do_specialties (void)
     return 0;
 }
 
+#ifdef __LIBRETRO__
+extern int RLOOP;
+void retroloop(){
+	m68k_do_execute();
+	RLOOP=1;
+}
+#endif
+
 void m68k_do_execute (void)
 {
 	for (;;) {
@@ -1384,6 +1392,9 @@ void m68k_do_execute (void)
 			if (m68k_do_specialties())
 				return;
 		}
+#ifdef __LIBRETRO__
+		if(RLOOP==0)break;
+#endif
 	}
 }
 
