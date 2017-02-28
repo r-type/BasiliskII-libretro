@@ -48,7 +48,7 @@ DEFS = -DHAVE_CONFIG_H  -DOS_linux -DDIRECT_ADDRESSING -DUNALIGNED_PROFITABLE -D
 
 SYSSRCS = video_retro.cpp ../Unix/extfs_unix.cpp ../Unix/serial_unix.cpp ../Unix/ether_unix.cpp ../Unix/Linux/scsi_linux.cpp audio_retro.cpp  ../dummy/prefs_editor_dummy.cpp   ./main_unix.cpp ../Unix/prefs_unix.cpp ../dummy/clip_dummy.cpp #../Unix/clip_unix.cpp
 
-CPUSRCS = ../uae_cpu/basilisk_glue.cpp ../uae_cpu/memory.cpp ../uae_cpu/newcpu.cpp ../uae_cpu/readcpu.cpp ../uae_cpu/fpu/fpu_ieee.cpp ../Unix/cpustbl.cpp ../Unix/cpudefs.cpp cpuemu1.cpp cpuemu2.cpp cpuemu3.cpp cpuemu4.cpp cpuemu5.cpp cpuemu6.cpp cpuemu7.cpp cpuemu8.cpp 
+CPUSRCS = ../uae_cpu/basilisk_glue.cpp ../uae_cpu/memory.cpp ../uae_cpu/newcpu.cpp ../uae_cpu/readcpu.cpp ../uae_cpu/fpu/fpu_ieee.cpp ./cpustbl.cpp ./cpudefs.cpp cpuemu1.cpp cpuemu2.cpp cpuemu3.cpp cpuemu4.cpp cpuemu5.cpp cpuemu6.cpp cpuemu7.cpp cpuemu8.cpp 
 
 
 XPLAT_SRCS = ../CrossPlatform/vm_alloc.cpp ../CrossPlatform/sigsegv.cpp ../CrossPlatform/video_blit.cpp

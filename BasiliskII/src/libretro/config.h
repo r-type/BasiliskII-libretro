@@ -16,7 +16,7 @@
 /* #undef ENABLE_ESD */
 
 /* Define if using DGA with framebuffer device. */
-/*#define ENABLE_FBDEV_DGA 1*/
+#define ENABLE_FBDEV_DGA 1
 
 /* Define if using GTK. */
 /* #undef ENABLE_GTK */
@@ -35,13 +35,13 @@
 /* #undef ENABLE_TUNTAP */
 
 /* Define if using video enabled on SEGV signals. */
-/*#define ENABLE_VOSF 1*/
+#define ENABLE_VOSF 1
 
 /* Define if using XFree86 DGA extension. */
 /* #undef ENABLE_XF86_DGA */
 
 /* Define if using XFree86 DGA extension. */
-/*#define ENABLE_XF86_VIDMODE 1*/
+#define ENABLE_XF86_VIDMODE 1
 
 /* Define to 1 if you have the `acoshl' function. */
 #define HAVE_ACOSHL 1
@@ -204,6 +204,9 @@
 
 /* Define to 1 if you have the `getgid' function. */
 #define HAVE_GETGID 1
+
+/* Define to 1 if you have the `getlocalename_l' function. */
+/* #undef HAVE_GETLOCALENAME_L */
 
 /* Define to 1 if you have the `getpagesize' function. */
 #define HAVE_GETPAGESIZE 1
@@ -405,7 +408,7 @@
 #define HAVE_POWL 1
 
 /* Define if pthreads are available. */
-//#define HAVE_PTHREADS 1
+#define HAVE_PTHREADS 1
 
 /* Define to 1 if you have the `pthread_cancel' function. */
 #define HAVE_PTHREAD_CANCEL 1
@@ -712,7 +715,6 @@
 /* #undef SIGNAL_NEED_REINSTALL */
 
 /* The size of `double', as computed by sizeof. */
-
 #define SIZEOF_DOUBLE 8
 
 /* The size of `float', as computed by sizeof. */
@@ -720,29 +722,22 @@
 
 /* The size of `int', as computed by sizeof. */
 #define SIZEOF_INT 4
-#ifdef PTR64
+
 /* The size of `long', as computed by sizeof. */
 #define SIZEOF_LONG 8
-#else
-#define SIZEOF_LONG 4
-#endif
-#ifdef PTR64
+
 /* The size of `long double', as computed by sizeof. */
 #define SIZEOF_LONG_DOUBLE 16
-#else
-#define SIZEOF_LONG_DOUBLE 12
-#endif
+
 /* The size of `long long', as computed by sizeof. */
 #define SIZEOF_LONG_LONG 8
 
 /* The size of `short', as computed by sizeof. */
 #define SIZEOF_SHORT 2
-#ifdef PTR64
+
 /* The size of `void *', as computed by sizeof. */
 #define SIZEOF_VOID_P 8
-#else
-#define SIZEOF_VOID_P 4
-#endif
+
 /* Define as the maximum value of type 'size_t', if the system doesn't define
    it. */
 #ifndef SIZE_MAX
@@ -877,13 +872,28 @@
    'reference to static identifier "f" in extern inline function'.
    This bug was observed with Sun C 5.12 SunOS_i386 2011/11/16.
 
-   Suppress the use of extern inline on problematic Apple configurations.
-   OS X 10.8 and earlier mishandle it; see, e.g.,
-   <http://lists.gnu.org/archive/html/bug-gnulib/2012-12/msg00023.html>.
+   Suppress extern inline (with or without __attribute__ ((__gnu_inline__)))
+   on configurations that mistakenly use 'static inline' to implement
+   functions or macros in standard C headers like <ctype.h>.  For example,
+   if isdigit is mistakenly implemented via a static inline function,
+   a program containing an extern inline function that calls isdigit
+   may not work since the C standard prohibits extern inline functions
+   from calling static functions.  This bug is known to occur on:
+
+     OS X 10.8 and earlier; see:
+     http://lists.gnu.org/archive/html/bug-gnulib/2012-12/msg00023.html
+
+     DragonFly; see
+     http://muscles.dragonflybsd.org/bulk/bleeding-edge-potential/latest-per-pkg/ah-tty-0.3.12.log
+
+     FreeBSD; see:
+     http://lists.gnu.org/archive/html/bug-gnulib/2014-07/msg00104.html
+
    OS X 10.9 has a macro __header_inline indicating the bug is fixed for C and
    for clang but remains for g++; see <http://trac.macports.org/ticket/41033>.
-   Perhaps Apple will fix this some day.  */
-#if (defined __APPLE__ \
+   Assume DragonFly and FreeBSD will be similar.  */
+#if (((defined __APPLE__ && defined __MACH__) \
+      || defined __DragonFly__ || defined __FreeBSD__) \
      && (defined __header_inline \
          ? (defined __cplusplus && defined __GNUC_STDC_INLINE__ \
             && ! defined __clang__) \
@@ -891,19 +901,19 @@
              && (defined __GNUC__ || defined __cplusplus)) \
             || (defined _FORTIFY_SOURCE && 0 < _FORTIFY_SOURCE \
                 && defined __GNUC__ && ! defined __cplusplus))))
-# define _GL_EXTERN_INLINE_APPLE_BUG
+# define _GL_EXTERN_INLINE_STDHEADER_BUG
 #endif
 #if ((__GNUC__ \
       ? defined __GNUC_STDC_INLINE__ && __GNUC_STDC_INLINE__ \
       : (199901L <= __STDC_VERSION__ \
          && !defined __HP_cc \
          && !(defined __SUNPRO_C && __STDC__))) \
-     && !defined _GL_EXTERN_INLINE_APPLE_BUG)
+     && !defined _GL_EXTERN_INLINE_STDHEADER_BUG)
 # define _GL_INLINE inline
 # define _GL_EXTERN_INLINE extern inline
 # define _GL_EXTERN_INLINE_IN_USE
 #elif (2 < __GNUC__ + (7 <= __GNUC_MINOR__) && !defined __STRICT_ANSI__ \
-       && !defined _GL_EXTERN_INLINE_APPLE_BUG)
+       && !defined _GL_EXTERN_INLINE_STDHEADER_BUG)
 # if defined __GNUC_GNU_INLINE__ && __GNUC_GNU_INLINE__
    /* __gnu_inline__ suppresses a GCC 4.2 diagnostic.  */
 #  define _GL_INLINE extern inline __attribute__ ((__gnu_inline__))
@@ -917,17 +927,19 @@
 # define _GL_EXTERN_INLINE static _GL_UNUSED
 #endif
 
-#if 4 < __GNUC__ + (6 <= __GNUC_MINOR__)
+/* In GCC 4.6 (inclusive) to 5.1 (exclusive),
+   suppress bogus "no previous prototype for 'FOO'"
+   and "no previous declaration for 'FOO'" diagnostics,
+   when FOO is an inline function in the header; see
+   <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54113> and
+   <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63877>.  */
+#if __GNUC__ == 4 && 6 <= __GNUC_MINOR__
 # if defined __GNUC_STDC_INLINE__ && __GNUC_STDC_INLINE__
 #  define _GL_INLINE_HEADER_CONST_PRAGMA
 # else
 #  define _GL_INLINE_HEADER_CONST_PRAGMA \
      _Pragma ("GCC diagnostic ignored \"-Wsuggest-attribute=const\"")
 # endif
-  /* Suppress GCC's bogus "no previous prototype for 'FOO'"
-     and "no previous declaration for 'FOO'"  diagnostics,
-     when FOO is an inline function in the header; see
-     <http://gcc.gnu.org/bugzilla/show_bug.cgi?id=54113>.  */
 # define _GL_INLINE_HEADER_BEGIN \
     _Pragma ("GCC diagnostic push") \
     _Pragma ("GCC diagnostic ignored \"-Wmissing-prototypes\"") \
@@ -939,6 +951,27 @@
 # define _GL_INLINE_HEADER_BEGIN
 # define _GL_INLINE_HEADER_END
 #endif
+
+/* Define as a marker that can be attached to declarations that might not
+    be used.  This helps to reduce warnings, such as from
+    GCC -Wunused-parameter.  */
+#ifndef _GL_UNUSED
+# if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
+#  define _GL_UNUSED __attribute__ ((__unused__))
+# else
+#  define _GL_UNUSED
+# endif
+#endif
+
+/* The __pure__ attribute was added in gcc 2.96.  */
+#ifndef _GL_ATTRIBUTE_PURE
+# if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
+#  define _GL_ATTRIBUTE_PURE __attribute__ ((__pure__))
+# else
+#  define _GL_ATTRIBUTE_PURE /* empty */
+# endif
+#endif
+
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
